@@ -1,9 +1,4 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista de Processos</title>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -329,23 +324,6 @@
             }
         }
     </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Processos de Contratação</h1>
-            <div class="search-container">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" id="pesquisa" placeholder="Pesquisar...">
-            </div>
-        </header>
-        
-        <div id="loader" class="loader">
-            <div class="spinner"></div>
-        </div>
-        
-        <div id="processos"></div>
-    </div>
 
     <script>
         // URL do JSON
@@ -703,6 +681,3 @@ function formatarCNPJ(cnpj) {
         obterProcessos();
     </script>
 
-
-</body>
-</html>
