@@ -1,62 +1,40 @@
 <script>
-// Função para formatar moeda brasileira
-function formatarMoeda(valor) {
-    // Verifica se o valor é um número válido
+
+
+
+// Funções utilitárias
+const formatarMoeda = (valor) => {
     if (typeof valor !== 'number' || isNaN(valor)) return 'R$ 0,00';
-    
     return valor.toLocaleString('pt-BR', {
         style: 'currency',
         currency: 'BRL',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     });
-}
+};
 
-// Função formatar CNPJ
-function formatarCNPJ(cnpj) {
+const formatarCNPJ = (cnpj) => {
     if (!cnpj) return 'Informação não disponível';
-
-    // Remove qualquer caractere que não seja número
     const cnpjNumeros = cnpj.replace(/\D/g, '');
-
-    // Verifica se o CNPJ tem o tamanho correto (14 dígitos)
     if (cnpjNumeros.length !== 14) return cnpj;
-
-    // Formata o CNPJ no padrão brasileiro (XX.XXX.XXX/XXXX-XX)
     return cnpjNumeros.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
-}
+};
 
-
-// função para formatar contrato
-function formatarContrato(contrato) {
+const formatarContrato = (contrato) => {
     if (!contrato) return 'Informação não disponível';
+    return contrato.startsWith('http') 
+        ? `<a href="${contrato}" target="_blank">Ver contrato</a>` 
+        : contrato;
+};
 
-    // Se for uma URL, exibe como link
-    if (contrato.startsWith('http')) {
-        return `<a href="${contrato}" target="_blank">Ver contrato</a>`;
-    } 
-    // Qualquer outra informação, exibe como texto
-    else {
-        return contrato;
-    }
-}
-
-
-  // Função para formatar local
-function formatarLocal(local) {
+const formatarLocal = (local) => {
     if (!local) return 'Informação não disponível';
 
-    // Verifica se é um email
     if (local.includes('@')) {
         return `<a href="mailto:${local}" target="_blank">${local}</a>`;
-    } 
-    // Verifica se é o Portal de Compras Públicas
-    else if (local.includes('portaldecompraspublicas')) {
-        return `<a href="${local}" target="_blank">Portal de Compras Públicas</a>`;
     }
-    // Verifica se já é uma URL completa
-    else if (local.startsWith('http')) {
-        // Tenta extrair o domínio principal para um texto mais curto
+
+    if (local.startsWith('http')) {
         try {
             const urlObj = new URL(local);
             const dominio = urlObj.hostname.replace('www.', '');
@@ -65,31 +43,17 @@ function formatarLocal(local) {
             return `<a href="${local}" target="_blank">Acessar site</a>`;
         }
     }
-    // Se parece um domínio, adiciona http:// para criar um link válido
-    else if (local.includes('.')) {
-        const dominio = local.replace('www.', '');
-        return `<a href="http://${local}" target="_blank">Acessar ${dominio}</a>`;
-    }
-    // Se não for nenhum dos casos acima, exibe como texto normal
-    else {
-        return local;
-    }
-}
 
+    return local;
+};
 
-// Função para formatar data no padrão brasileiro
-function formatarData(dataOriginal) {
-    // Verifica se a data é válida
+const formatarData = (dataOriginal) => {
     if (!dataOriginal) return 'Data não informada';
     
     try {
-        // Converte a string de data para um objeto Date
         const data = new Date(dataOriginal);
-        
-        // Verifica se a data é válida
         if (isNaN(data.getTime())) return 'Data inválida';
         
-        // Formata a data no padrão brasileiro
         return data.toLocaleDateString('pt-BR', {
             day: '2-digit',
             month: '2-digit',
@@ -98,131 +62,185 @@ function formatarData(dataOriginal) {
     } catch (error) {
         return 'Data não processada';
     }
+};
+
+// Função de filtro
+function filtrarProcessos(termoBusca, processos) {
+    const termoBuscaLower = termoBusca.toLowerCase();
+
+    return processos.filter(processo => {
+        const camposBusca = [
+            processo.numeroProcesso.toString(),
+            processo.anoProcesso.toString(),
+            processo.modalidade,
+            processo.objeto,
+            processo.status,
+            processo.empresaVencedora,
+            processo.responsavelContratacao,
+            processo.cnpjEmpresa
+        ];
+
+        return camposBusca.some(campo => 
+            campo && campo.toString().toLowerCase().includes(termoBuscaLower)
+        );
+    });
 }
 
-async function carregarDadosCompras() {
-    try {
-        const response = await fetch('https://script.google.com/macros/s/AKfycbyLbH29klt6xJKOVQWbOLTNpmkxI-Hlz0PXPLKtTI0kQ4ahxgBW53lgnOIfMr26FkjP/exec');
-        const data = await response.json();
+// Função de renderização de processos
+function renderizarProcessos(data) {
+    const processosListaMain = document.getElementById('compras-processos-lista');
+    processosListaMain.innerHTML = '';
 
-        data.sort((a, b) => {
-            const numA = a.numeroProcesso;
-            const numB = b.numeroProcesso;
-            const anoA = a.anoProcesso;
-            const anoB = b.anoProcesso;
-            
-            if (anoB !== anoA) return anoB - anoA;
-            return numB - numA;
+    data.forEach(item => {
+        const processoSection = document.createElement('section');
+        processoSection.classList.add('compras-processo');
+
+        const processoHeader = document.createElement('header');
+        processoHeader.classList.add('compras-processo-header');
+        processoHeader.innerHTML = `
+            <p>
+                <strong>Processo nº ${item.numeroProcesso}/${item.anoProcesso}</strong> -   
+                ${item.modalidade || 'Modalidade não definida'} nº ${item.numeroModalidade || 'Numeração não definida'}/${item.anoModalidade} - 
+                ${item.status}
+            </p>
+            <button class="compras-expandir-btn">Expandir</button>
+        `;
+
+        const ulDetalhes = document.createElement('div');
+        ulDetalhes.classList.add('compras-detalhes-processo');
+
+        const liObjeto = document.createElement('p');
+        liObjeto.innerHTML = `<strong>Objeto</strong> ${item.objeto}`;
+        ulDetalhes.appendChild(liObjeto);
+
+        const valorEstimadoFormatado = formatarMoeda(item.valorEstimado);
+        const valorHomologadoFormatado = formatarMoeda(item.valorHomologado || 0);
+        const dataAberturaFormatada = formatarData(item.dataAbertura);
+        const dataPublicacaoFormatada = formatarData(item.dataPublicacao);
+        const dataHomologacaoFormatada = formatarData(item.dataHomologacao);
+
+        const liDetalhesGrid = document.createElement('div');
+        liDetalhesGrid.classList.add('compras-detalhes-grid');
+        liDetalhesGrid.innerHTML = `
+            <ul>
+                <li><strong>Responsável pela Contratação</strong><br>${item.responsavelContratacao || 'Não informado'}</li>
+                <li><strong>Local</strong><br>${formatarLocal(item.local || 'Não informado')}</li>
+                <li><strong>Data de Publicação</strong><br>${dataPublicacaoFormatada || 'Não definida'}</li>
+                <li><strong>Data de Abertura</strong><br>${dataAberturaFormatada || 'Não definida'}</li>
+                <li><strong>Valor Estimado</strong><br>${valorEstimadoFormatado || 'Não informado'}</li>
+                <li><strong>Data de Homologação</strong><br>${dataHomologacaoFormatada || 'Não definida'}</li>
+                <li><strong>Valor Homologado</strong><br>${valorHomologadoFormatado || 'Não definido'}</li>
+                <li><strong>Empresa Vencedora</strong><br>${item.empresaVencedora || 'Não definida'}</li>
+                <li><strong>CNPJ da Empresa</strong><br>
+                    <a href="https://portaldatransparencia.gov.br/sancoes/consulta?cpfCnpj=${item.cnpjEmpresa}" 
+                       target="_blank" class="cnpj-link">
+                       ${formatarCNPJ(item.cnpjEmpresa || 'Não informado')}
+                    </a>
+                </li>
+                <li><strong>Contrato</strong><br>${formatarContrato(item.contrato || 'Não informado')}</li>
+                <li><strong>Fiscal do Contrato</strong><br>${item.fiscalContrato || 'Não informado'}</li>
+            </ul>
+        `;
+        ulDetalhes.appendChild(liDetalhesGrid);
+
+        const listaDocumentos = document.createElement('div');
+        listaDocumentos.classList.add('compras-lista-documentos');
+        
+        const documentosOrdenados = item.documentos
+            .sort((a, b) => a.nome.localeCompare(b.nome));
+
+        listaDocumentos.innerHTML = '<strong>Documentos do Processo</strong>';
+        const ulDocumentos = document.createElement('ul');
+        documentosOrdenados.forEach(doc => {
+            const li = document.createElement('li');
+            li.innerHTML = `<a href="${doc.link}" target="_blank">${doc.nome}</a>`;
+            ulDocumentos.appendChild(li);
         });
 
-        const processosListaMain = document.getElementById('compras-processos-lista');
-        processosListaMain.innerHTML = '';
+        listaDocumentos.appendChild(ulDocumentos);
+        ulDetalhes.appendChild(listaDocumentos);
 
-        data.forEach(item => {
-            const processoSection = document.createElement('section');
-            processoSection.classList.add('compras-processo');
-
-            const processoHeader = document.createElement('header');
-            processoHeader.classList.add('compras-processo-header');
-            processoHeader.innerHTML = `
-                <p>
-                    <strong>Processo nº ${item.numeroProcesso}/${item.anoProcesso}</strong> - 
-                    ${item.modalidade} nº ${item.numeroContratacao}/${item.anoContratacao} - 
-                    ${item.status}
-                </p>
-                <button class="compras-expandir-btn">Expandir</button>
-            `;
-
-            const ulDetalhes = document.createElement('div');
-            ulDetalhes.classList.add('compras-detalhes-processo');
-
-            const liObjeto = document.createElement('p');
-            liObjeto.innerHTML = `<strong>Objeto: </strong> ${item.objeto}`;
-            ulDetalhes.appendChild(liObjeto);
-
-            // Formatações de valores e datas
-            const valorEstimadoFormatado = formatarMoeda(item.valorEstimado);
-            const valorHomologadoFormatado = formatarMoeda(item.valorHomologado);
-            const dataAberturaFormatada = formatarData(item.dataAbertura);
-            const dataEnceramentoFormatada = formatarData(item.dataEncerramento);
-
-            const liDetalhesGrid = document.createElement('div');
-            liDetalhesGrid.classList.add('compras-detalhes-grid');
-            liDetalhesGrid.innerHTML = `
-                <ul>
-                    <li><strong>Responsável pela Contratação<br></strong> ${item.responsavelContratacao}</li>
-                    <li><strong>Local<br></strong><span class="texto-longo">${item.local}</span></li>
-                    <li><strong>Data de Abertura<br></strong> ${dataAberturaFormatada}</li>
-                    <li><strong>Valor Estimado<br></strong> ${valorEstimadoFormatado}</li>
-                    <li><strong>Data de Encerramento<br></strong> ${dataEnceramentoFormatada}</li>
-                    <li><strong>Valor Homologado<br></strong> ${valorHomologadoFormatado}</li>
-                    <li><strong>Empresa Vencedora<br></strong> ${item.empresaVencedora}</li>
-                    <li><strong>CNPJ da Empresa Vencedora<br></strong> <a href="https://portaldatransparencia.gov.br/sancoes/consulta?cadastro=1&cadastro=2&cpfCnpj=${item.cnpjEmpresa}" target="_blank" class="cnpj-link">${item.cnpjEmpresa}</a></li>
-                    <li><strong>Contrato<br></strong><span class="texto-longo">${item.contrato}</span></li>
-                    <li><strong>Fiscal do Contrato<br></strong> ${item.fiscalContrato}</li>
-                </ul>
-            `;
-            ulDetalhes.appendChild(liDetalhesGrid);
-
-            // Nova seção para lista de documentos
-            const listaDocumentos = document.createElement('div');
-            listaDocumentos.classList.add('compras-lista-documentos');
-            
-            // Ordenar documentos alfabeticamente
-            const documentosOrdenados = item.documentos.map((doc, index) => ({
-                nome: doc,
-                link: item.link[index]
-            })).sort((a, b) => a.nome.localeCompare(b.nome));
-
-            listaDocumentos.innerHTML = '<strong>Documentos do Processo</strong>';
-            const ulDocumentos = document.createElement('ul');
-            documentosOrdenados.forEach(doc => {
-                const li = document.createElement('li');
-                li.innerHTML = `<a href="${doc.link}" target="_blank">${doc.nome}</a>`;
-                ulDocumentos.appendChild(li);
-            });
-
-            listaDocumentos.appendChild(ulDocumentos);
-            ulDetalhes.appendChild(listaDocumentos);
-
-            const expandirBtn = processoHeader.querySelector('.compras-expandir-btn');
-            expandirBtn.addEventListener('click', () => {
-                // Collapse all other processes
-                const todosProcessos = document.querySelectorAll('.compras-processo');
-                todosProcessos.forEach(processo => {
-                    const detalhes = processo.querySelector('.compras-detalhes-processo');
-                    const btn = processo.querySelector('.compras-expandir-btn');
-                    
-                    // Close all other processes
-                    if (processo !== processoSection) {
-                        detalhes.classList.remove('expanded');
-                        btn.classList.remove('ativo');
-                        btn.textContent = 'Expandir';
-                    }
-                });
-
-                // Toggle current process
-                if (!ulDetalhes.classList.contains('expanded')) {
-                    ulDetalhes.classList.add('expanded');
-                    expandirBtn.classList.add('ativo');
-                    expandirBtn.textContent = 'Recolher';
-                } else {
-                    ulDetalhes.classList.remove('expanded');
-                    expandirBtn.classList.remove('ativo');
-                    expandirBtn.textContent = 'Expandir';
+        const expandirBtn = processoHeader.querySelector('.compras-expandir-btn');
+        expandirBtn.addEventListener('click', () => {
+            const todosProcessos = document.querySelectorAll('.compras-processo');
+            todosProcessos.forEach(processo => {
+                const detalhes = processo.querySelector('.compras-detalhes-processo');
+                const btn = processo.querySelector('.compras-expandir-btn');
+                
+                if (processo !== processoSection) {
+                    detalhes.classList.remove('expanded');
+                    btn.classList.remove('ativo');
+                    btn.textContent = 'Expandir';
                 }
             });
 
-            processoSection.appendChild(processoHeader);
-            processoSection.appendChild(ulDetalhes);
-
-            processosListaMain.appendChild(processoSection);
+            if (!ulDetalhes.classList.contains('expanded')) {
+                ulDetalhes.classList.add('expanded');
+                expandirBtn.classList.add('ativo');
+                expandirBtn.textContent = 'Recolher';
+            } else {
+                ulDetalhes.classList.remove('expanded');
+                expandirBtn.classList.remove('ativo');
+                expandirBtn.textContent = 'Expandir';
+            }
         });
 
-    } catch (error) {
-        console.error('Erro ao carregar os dados de compras:', error);
+        processoSection.appendChild(processoHeader);
+        processoSection.appendChild(ulDetalhes);
+
+        processosListaMain.appendChild(processoSection);
+    });
+
+    // Adiciona mensagem se nenhum processo for encontrado
+    if (data.length === 0) {
+        processosListaMain.innerHTML = `
+            <div class="sem-resultados">
+                <p>Nenhum processo encontrado.</p>
+                <p>Tente outro termo de busca.</p>
+            </div>
+        `;
     }
 }
 
+// Função principal para carregar dados
+async function carregarDadosCompras() {
+    try {
+        const response = await fetch('https://script.google.com/macros/s/AKfycbzFBqdJ7IJ8gDXjENcOMqkZ80QREU3kQU_5GFtXNnIobyUTxfb3Nue-cRYn3buaUsS4/exec');
+        const data = await response.json();
+
+        // Ordenação dos processos
+        const processosSorted = data.sort((a, b) => {
+            const anoComparacao = b.anoProcesso - a.anoProcesso;
+            return anoComparacao !== 0 
+                ? anoComparacao 
+                : b.numeroProcesso - a.numeroProcesso;
+        });
+
+        // Adiciona evento de busca
+        const campoBusca = document.getElementById('campo-busca-compras');
+        
+        // Armazena os dados originais como propriedade global para referência
+        window.dadosProcessos = processosSorted;
+
+        campoBusca.addEventListener('input', (e) => {
+            const termoBusca = e.target.value;
+            const processosFiltrados = filtrarProcessos(termoBusca, window.dadosProcessos);
+            
+            // Renderiza apenas os processos filtrados
+            renderizarProcessos(processosFiltrados);
+        });
+
+        // Renderiza todos os processos inicialmente
+        renderizarProcessos(processosSorted);
+
+    } catch (error) {
+        console.error('Erro ao carregar os dados de compras:', error);
+        document.getElementById('compras-processos-lista').innerHTML = 
+            `<p>Não foi possível carregar os dados. Erro: ${error.message}</p>`;
+    }
+}
+
+// Carregar dados quando a página carregar
 window.onload = carregarDadosCompras;
+
 </script>
